@@ -1,0 +1,14 @@
+# File di lavoro di R e RStudio
+.Rhistory
+.RData
+.Rproj.user/
+.Rapp.history
+
+old/
+data_input/
+output/
+
+.Rproj.user
+.httr-oauth
+.DS_Store
+.quarto
