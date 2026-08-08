@@ -11,7 +11,8 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Project Work BRCPS26
+# Project Work BRCPS26 Architecture
+
 
 pw_data_analysis_pipeline/
 

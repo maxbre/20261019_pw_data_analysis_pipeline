@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Project Work BRCPS26
+# Project Work BRCPS26 Architecture
 
 pw_data_analysis_pipeline/
 
