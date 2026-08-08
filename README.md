@@ -4,11 +4,13 @@
 # Project Work Architecture
 
 **Biostatistica per la Ricerca Clinica e la Pubblicazione Scientifica
-(BRCPS 2026)**
+(BRCPS26 @UNIPD)**
 
 pw_data_analysis_pipeline/
 
 ├─ \*.Rproj
+
+├─ .gitignore
 
 ├─ main.R
 
@@ -22,7 +24,7 @@ pw_data_analysis_pipeline/
 
     ├─ 01_data_prep.R              # load and data cleaning
 
-    ├─ 02_propensity_score.R       # model estimation PS, weigths and balance
+    ├─ 02_propensity_score.R       # model estimation PS, weigths and balance 
 
     ├─ 03_outcome_models.R         # model outcome G-computation, Bootstrap
 
