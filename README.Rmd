@@ -47,4 +47,10 @@ pw_data_analysis_pipeline/
     └─ 07_pop_analysis.R           # fns demography
 
 
-Folders "data_input/" and "output/" are both "gitignored" but fully available in local repo.
+Both folders "data_input/" and "output/" are "gitignored" but available in local repo.
+
+--- 
+
+*Beware: all the material must be considered experimental, in full development, not yet tested.*
+
+*Caveat emptor: use it at your own risk.*
