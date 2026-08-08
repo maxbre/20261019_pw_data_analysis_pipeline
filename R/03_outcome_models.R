@@ -90,15 +90,18 @@ run_g_computation_scaled <- function(survey_model, data, rr_lit = 1.05, soglia_c
 
 # Esegue il bootstrap probabilistico per propagare l'incertezza campionaria ed epidemiologica
 run_bootstrap_uncertainty <- function(data,
-                                      formula_outcome, 
+                                      formula_outcome,
+                                      strata_var = NULL, # Riconfigurato come opzionale (default NULL)
                                       B = 500, 
                                       rr_central = 1.05, 
                                       rr_lower = 1.03, 
                                       rr_upper = 1.07,
                                       soglia_cut = 20,
                                       var_no2_cont = "mean_no2",
-                                      weight_var = "weight_ate_wz") {
-  set.seed(1234)
+                                      weight_var = "weight_ate_wz",
+                                      seed = 1234) {
+  
+  if (!is.null(seed)) set.seed(seed)
   
   # Distribuzione normale del log(RR) di letteratura (riferito a +10 ug/m3)
   mean_log_RR <- log(rr_central)
@@ -108,14 +111,18 @@ run_bootstrap_uncertainty <- function(data,
   boot_casi_attr <- numeric(B)
   boot_paf_pct   <- numeric(B)
   
+  # Gestione condizionale delle formule per svydesign
+  boot_formula_weight <- if (!is.null(weight_var)) as.formula(paste("~", weight_var)) else NULL
+  boot_formula_strata <- if (!is.null(strata_var)) as.formula(paste("~", strata_var)) else NULL
+  
   pb <- txtProgressBar(min = 0, max = B, style = 3)
   
   for (b in 1:B) {
-    # 1. Resampling non parametrico delle sezioni censuarie
+    # Resampling non parametrico delle sezioni censuarie
     boot_idx  <- sample(1:nrow(data), replace = TRUE)
     boot_data <- data[boot_idx, ]
     
-    # 2. Calcolo del Delta C specifico per il campionamento corrente
+    # Calcolo del Delta C specifico per il campionamento corrente
     mean_c_exposed_b <- boot_data |> 
       filter(pol_bin_ue == 1) |> 
       summarise(mean_val = mean(.data[[var_no2_cont]], na.rm = TRUE)) |> 
@@ -123,24 +130,29 @@ run_bootstrap_uncertainty <- function(data,
     
     delta_c_b <- mean_c_exposed_b - soglia_cut
     
-    # 3. Estrazione casuale dell'effetto biologico di letteratura (+10 ug/m3)
+    # Estrazione casuale dell'effetto biologico di letteratura (+10 ug/m3)
     drawn_log_RR <- rnorm(1, mean = mean_log_RR, sd = sd_log_RR)
     drawn_rr     <- exp(drawn_log_RR)
     
-    # 4. Scaling del RR estratto sul Delta C specifico del campione b
+    # Scaling del RR estratto sul Delta C specifico del campione b
     rr_effective_b   <- drawn_rr^(delta_c_b / 10)
     log_rr_effective <- log(rr_effective_b)
     
-    # 5. Fit del modello pesato sul campione bootstrap
+    # Fit del modello pesato sul campione bootstrap
     boot_formula_weight <- as.formula(paste("~", weight_var))
-    boot_design <- svydesign(ids = ~1, weights = boot_formula_weight, data = boot_data)
-    boot_model  <- svyglm(formula_outcome, design = boot_design, family = quasipoisson(link = "log"))
+    boot_design <- svydesign(ids = ~1, 
+                             weights = boot_formula_weight, 
+                             strata = as.formula(paste("~", strata_var)),
+                             data = boot_data)
+    boot_model  <- svyglm(formula_outcome, 
+                          design = boot_design, 
+                          family = quasipoisson(link = "log"))
     
-    # 6. Innesto del log(RR) scalato
+    # Innesto del log(RR) scalato
     stopifnot("pol_bin_ue" %in% names(boot_model$coefficients))
     boot_model$coefficients["pol_bin_ue"] <- log_rr_effective
     
-    # 7. G-Computation sul campione bootstrap
+    # G-Computation sul campione bootstrap
     scen_unexposed <- boot_data |> mutate(pol_bin_ue = 0)
     
     pred_real  <- as.numeric(predict(boot_model, newdata = boot_data, type = "response"))
@@ -166,9 +178,97 @@ run_bootstrap_uncertainty <- function(data,
   )
 }
 
+# # Bootstrap probabilistico con clustering comunale per la propagazione dell'incertezza
+# run_bootstrap_uncertainty_cluster <- function(data, 
+#                                               formula_outcome, 
+#                                               cluster_var = "cod_comune",
+#                                               B = 500, 
+#                                               rr_central = 1.05, 
+#                                               rr_lower = 1.03, 
+#                                               rr_upper = 1.07,
+#                                               soglia_cut = 20,
+#                                               var_no2_cont = "mean_no2",
+#                                               weight_var = "weight_ate_wz") {
+#   set.seed(1234)
+#   
+#   # 1. Parametri dell'effetto biologico esterno (scala logaritmica per +10 ug/m3)
+#   mean_log_RR <- log(rr_central)
+#   sd_log_RR   <- (log(rr_upper) - log(rr_lower)) / (2 * 1.96)
+#   
+#   # Estrazione dei cluster unici (Comuni)
+#   unique_clusters <- unique(data[[cluster_var]])
+#   
+#   # Vettori per memorizzare gli output a ogni iterazione
+#   boot_casi_attr <- numeric(B)
+#   boot_paf_pct   <- numeric(B)
+#   
+#   pb <- txtProgressBar(min = 0, max = B, style = 3)
+#   
+#   for (b in 1:B) {
+#     
+#     # 2. CLUSTER BOOTSTRAP: Resampling dei Comuni con reinserimento
+#     boot_clusters <- data.frame(
+#       cluster_id = sample(unique_clusters, replace = TRUE)
+#     )
+#     names(boot_clusters) <- cluster_var
+#     
+#     # Duplicazione corretta delle sezioni censuarie dei comuni estratti più volte
+#     boot_data <- boot_clusters |> 
+#       left_join(data, by = cluster_var, relationship = "many-to-many")
+#     
+#     # 3. Calcolo del Delta C specifico per il campione clusterizzato corrente
+#     mean_c_exposed_b <- boot_data |> 
+#       filter(pol_bin_ue == 1) |> 
+#       summarise(mean_val = mean(.data[[var_no2_cont]], na.rm = TRUE)) |> 
+#       pull(mean_val)
+#     
+#     delta_c_b <- mean_c_exposed_b - soglia_cut
+#     
+#     # 4. Estrazione dell'effetto biologico e riscalamento dinamico su delta_c_b
+#     drawn_log_RR     <- rnorm(1, mean = mean_log_RR, sd = sd_log_RR)
+#     drawn_rr         <- exp(drawn_log_RR)
+#     rr_effective_b   <- drawn_rr^(delta_c_b / 10)
+#     log_rr_effective <- log(rr_effective_b)
+#     
+#     # 5. Fit del modello pesato sul nuovo campione clusterizzato
+#     boot_formula_weight <- as.formula(paste("~", weight_var))
+#     boot_design <- svydesign(ids = ~1, weights = boot_formula_weight, data = boot_data)
+#     boot_model  <- svyglm(formula_outcome, design = boot_design, family = quasipoisson(link = "log"))
+#     
+#     # 6. Iniezione del log(RR) scalato nel modello
+#     stopifnot("pol_bin_ue" %in% names(boot_model$coefficients))
+#     boot_model$coefficients["pol_bin_ue"] <- log_rr_effective
+#     
+#     # 7. Scenari controfattuali e G-Computation
+#     scen_unexposed <- boot_data |> mutate(pol_bin_ue = 0)
+#     
+#     pred_real  <- as.numeric(predict(boot_model, newdata = boot_data, type = "response"))
+#     pred_unexp <- as.numeric(predict(boot_model, newdata = scen_unexposed, type = "response"))
+#     
+#     tot_real  <- sum(pred_real, na.rm = TRUE)
+#     tot_unexp <- sum(pred_unexp, na.rm = TRUE)
+#     
+#     casi_attr_b <- tot_real - tot_unexp
+#     paf_b       <- (casi_attr_b / tot_real) * 100
+#     
+#     boot_casi_attr[b] <- casi_attr_b
+#     boot_paf_pct[b]   <- paf_b
+#     
+#     setTxtProgressBar(pb, b)
+#   }
+#   close(pb)
+#   
+#   # Restituisce un dataframe con le distribuzioni bootstrap complete
+#   data.frame(
+#     casi_attribuibili = boot_casi_attr,
+#     paf_percentuale   = boot_paf_pct
+#   )
+# }
+
 # Bootstrap probabilistico con clustering comunale per la propagazione dell'incertezza
 run_bootstrap_uncertainty_cluster <- function(data, 
                                               formula_outcome, 
+                                              strata_var = NULL,           # Riconfigurato come opzionale (default NULL)
                                               cluster_var = "cod_comune",
                                               B = 500, 
                                               rr_central = 1.05, 
@@ -176,15 +276,22 @@ run_bootstrap_uncertainty_cluster <- function(data,
                                               rr_upper = 1.07,
                                               soglia_cut = 20,
                                               var_no2_cont = "mean_no2",
-                                              weight_var = "weight_ate_wz") {
-  set.seed(1234)
+                                              weight_var = "weight_ate_wz",
+                                              seed = 1234) {
+  
+  if (!is.null(seed)) set.seed(seed)
   
   # 1. Parametri dell'effetto biologico esterno (scala logaritmica per +10 ug/m3)
   mean_log_RR <- log(rr_central)
   sd_log_RR   <- (log(rr_upper) - log(rr_lower)) / (2 * 1.96)
   
   # Estrazione dei cluster unici (Comuni)
+  stopifnot(cluster_var %in% names(data))
   unique_clusters <- unique(data[[cluster_var]])
+  
+  # Gestione condizionale delle formule per svydesign
+  boot_formula_weight <- if (!is.null(weight_var)) as.formula(paste("~", weight_var)) else NULL
+  boot_formula_strata <- if (!is.null(strata_var)) as.formula(paste("~", strata_var)) else NULL
   
   # Vettori per memorizzare gli output a ogni iterazione
   boot_casi_attr <- numeric(B)
@@ -218,10 +325,19 @@ run_bootstrap_uncertainty_cluster <- function(data,
     rr_effective_b   <- drawn_rr^(delta_c_b / 10)
     log_rr_effective <- log(rr_effective_b)
     
-    # 5. Fit del modello pesato sul nuovo campione clusterizzato
-    boot_formula_weight <- as.formula(paste("~", weight_var))
-    boot_design <- svydesign(ids = ~1, weights = boot_formula_weight, data = boot_data)
-    boot_model  <- svyglm(formula_outcome, design = boot_design, family = quasipoisson(link = "log"))
+    # 5. Fit del modello pesato sul nuovo campione clusterizzato (con stratificazione opzionale)
+    boot_design <- svydesign(
+      ids     = ~1, 
+      weights = boot_formula_weight, 
+      strata  = boot_formula_strata, # Sarà NULL se strata_var non viene specificato
+      data    = boot_data
+    )
+    
+    boot_model <- svyglm(
+      formula_outcome, 
+      design = boot_design, 
+      family = quasipoisson(link = "log")
+    )
     
     # 6. Iniezione del log(RR) scalato nel modello
     stopifnot("pol_bin_ue" %in% names(boot_model$coefficients))
@@ -253,23 +369,119 @@ run_bootstrap_uncertainty_cluster <- function(data,
   )
 }
 
+# # Bootstrap probabilistico spazio-temporale con riscalatura dinamica del Risk Ratio
+# run_bootstrap_uncertainty_spatiotemporal <- function(data, 
+#                                                      formula_outcome, 
+#                                                      col_years,
+#                                                      cluster_var = "cod_comune",
+#                                                      threshold = 20,
+#                                                      B = 500, 
+#                                                      rr_central = 1.05, 
+#                                                      rr_lower = 1.03, 
+#                                                      rr_upper = 1.07,
+#                                                      weight_var = "weight_ate_wz") {
+#   set.seed(1234)
+#   
+#   if (!cluster_var %in% names(data)) {
+#     stop(paste0("La colonna '", cluster_var, "' non esiste nel dataframe fornito."))
+#   }
+#   
+#   # Parametri dell'effetto biologico esterno (scala logaritmica per +10 ug/m3)
+#   mean_log_RR <- log(rr_central)
+#   sd_log_RR   <- (log(rr_upper) - log(rr_lower)) / (2 * 1.96)
+#   
+#   # Estrazione dei cluster unici (Comuni) e conteggio anni
+#   unique_clusters <- unique(data[[cluster_var]])
+#   num_years       <- length(col_years)
+#   
+#   # Vettori per memorizzare le distribuzioni bootstrap
+#   boot_casi_attr <- numeric(B)
+#   boot_paf_pct   <- numeric(B)
+#   
+#   pb <- txtProgressBar(min = 0, max = B, style = 3)
+#   
+#   for (b in 1:B) {
+#     
+#     # BOOTSTRAP TEMPORALE: Campionamento anni con reinserimento
+#     sampled_years <- sample(col_years, size = num_years, replace = TRUE)
+#     
+#     # CLUSTER BOOTSTRAP SPAZIALE: Resampling Comuni con reinserimento
+#     boot_clusters <- setNames(
+#       data.frame(sample(unique_clusters, replace = TRUE)),
+#       cluster_var
+#     )
+#     
+#     boot_data <- boot_clusters |> 
+#       left_join(data, by = cluster_var, relationship = "many-to-many")
+#     
+#     # RICALCOLO DELL'ESPOSIZIONE CONTINUA E DICOTOMICA
+#     # no2_mean_boot è la concentrazione media risultante dal campionamento temporale
+#     no2_mean_boot        <- rowMeans(as.matrix(boot_data[, sampled_years]), na.rm = TRUE)
+#     boot_data$pol_bin_ue <- as.numeric(no2_mean_boot > threshold)
+#     
+#     # CALCOLO DEL DELTA C DINAMICO SULLE SEZIONI ESPOSTE DEL CAMPIONE b
+#     # Si calcola la media di no2_mean_boot solo per i casi in cui pol_bin_ue == 1
+#     mean_c_exposed_b <- mean(no2_mean_boot[boot_data$pol_bin_ue == 1], na.rm = TRUE)
+#     delta_c_b        <- mean_c_exposed_b - threshold
+#     
+#     # ESTRAZIONE E SCALING DEL RISK RATIO BIOLOGICO
+#     drawn_log_RR     <- rnorm(1, mean = mean_log_RR, sd = sd_log_RR)
+#     drawn_rr         <- exp(drawn_log_RR)
+#     rr_effective_b   <- drawn_rr^(delta_c_b / 10)
+#     log_rr_effective <- log(rr_effective_b)
+#     
+#     # FIT MODELLO + INNESTO COEFFICIENTE SCALATO
+#     boot_formula_weight <- as.formula(paste("~", weight_var))
+#     boot_design <- svydesign(ids = ~1, weights = boot_formula_weight, data = boot_data)
+#     boot_model  <- svyglm(formula_outcome, design = boot_design, family = quasipoisson(link = "log"))
+#     
+#     stopifnot("pol_bin_ue" %in% names(boot_model$coefficients))
+#     boot_model$coefficients["pol_bin_ue"] <- log_rr_effective
+#     
+#     # 7. G-COMPUTATION
+#     scen_unexposed <- boot_data |> mutate(pol_bin_ue = 0)
+#     
+#     pred_real  <- as.numeric(predict(boot_model, newdata = boot_data, type = "response"))
+#     pred_unexp <- as.numeric(predict(boot_model, newdata = scen_unexposed, type = "response"))
+#     
+#     tot_real  <- sum(pred_real, na.rm = TRUE)
+#     tot_unexp <- sum(pred_unexp, na.rm = TRUE)
+#     
+#     casi_attr_b <- tot_real - tot_unexp
+#     paf_b       <- (casi_attr_b / tot_real) * 100
+#     
+#     boot_casi_attr[b] <- casi_attr_b
+#     boot_paf_pct[b]   <- paf_b
+#     
+#     setTxtProgressBar(pb, b)
+#   }
+#   close(pb)
+#   
+#   # Restituzione del dataframe con i risultati completi
+#   data.frame(
+#     casi_attribuibili = boot_casi_attr,
+#     paf_percentuale   = boot_paf_pct
+#   )
+# }
 
 # Bootstrap probabilistico spazio-temporale con riscalatura dinamica del Risk Ratio
 run_bootstrap_uncertainty_spatiotemporal <- function(data, 
                                                      formula_outcome, 
+                                                     strata_var = NULL,           # Riconfigurato come opzionale (default NULL)
                                                      col_years,
                                                      cluster_var = "cod_comune",
-                                                     threshold = 20,
+                                                     threshold = 20,              # air quality threshold
                                                      B = 500, 
                                                      rr_central = 1.05, 
                                                      rr_lower = 1.03, 
                                                      rr_upper = 1.07,
-                                                     weight_var = "weight_ate_wz") {
-  set.seed(1234)
+                                                     weight_var = "weight_ate_wz",
+                                                     seed = 1234) {
   
-  if (!cluster_var %in% names(data)) {
-    stop(paste0("La colonna '", cluster_var, "' non esiste nel dataframe fornito."))
-  }
+  if (!is.null(seed)) set.seed(seed)
+  
+  # Validazione colonna cluster
+  stopifnot(cluster_var %in% names(data))
   
   # Parametri dell'effetto biologico esterno (scala logaritmica per +10 ug/m3)
   mean_log_RR <- log(rr_central)
@@ -278,6 +490,10 @@ run_bootstrap_uncertainty_spatiotemporal <- function(data,
   # Estrazione dei cluster unici (Comuni) e conteggio anni
   unique_clusters <- unique(data[[cluster_var]])
   num_years       <- length(col_years)
+  
+  # Gestione condizionale delle formule per svydesign
+  boot_formula_weight <- if (!is.null(weight_var)) as.formula(paste("~", weight_var)) else NULL
+  boot_formula_strata <- if (!is.null(strata_var)) as.formula(paste("~", strata_var)) else NULL
   
   # Vettori per memorizzare le distribuzioni bootstrap
   boot_casi_attr <- numeric(B)
@@ -315,10 +531,19 @@ run_bootstrap_uncertainty_spatiotemporal <- function(data,
     rr_effective_b   <- drawn_rr^(delta_c_b / 10)
     log_rr_effective <- log(rr_effective_b)
     
-    # FIT MODELLO + INNESTO COEFFICIENTE SCALATO
-    boot_formula_weight <- as.formula(paste("~", weight_var))
-    boot_design <- svydesign(ids = ~1, weights = boot_formula_weight, data = boot_data)
-    boot_model  <- svyglm(formula_outcome, design = boot_design, family = quasipoisson(link = "log"))
+    # FIT MODELLO + INNESTO COEFFICIENTE SCALATO (con peso e stratificazione opzionali)
+    boot_design <- svydesign(
+      ids     = ~1, 
+      weights = boot_formula_weight, 
+      strata  = boot_formula_strata, # Sarà NULL se strata_var non viene specificato
+      data    = boot_data
+    )
+    
+    boot_model <- svyglm(
+      formula_outcome, 
+      design = boot_design, 
+      family = quasipoisson(link = "log")
+    )
     
     stopifnot("pol_bin_ue" %in% names(boot_model$coefficients))
     boot_model$coefficients["pol_bin_ue"] <- log_rr_effective
@@ -348,6 +573,7 @@ run_bootstrap_uncertainty_spatiotemporal <- function(data,
     paf_percentuale   = boot_paf_pct
   )
 }
+
 
 ######################################
 
