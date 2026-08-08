@@ -35,3 +35,6 @@ pw_data_analysis_pipeline/
     ├─ 06_trend_mk_sen.R           # fns trend mann-kenndal, ses's slope NO2
 
     └─ 07_pop_analysis.R           # fns demography
+
+Folders “data_input/” and “output/” are both “gitignored” but fully
+available in local repo.
