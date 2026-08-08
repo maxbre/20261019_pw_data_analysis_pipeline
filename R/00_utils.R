@@ -48,8 +48,6 @@ clean_label <- function(vars, dict = var_labels) {
 #clean_label("no2_conc")
 #clean_label(c("pol_bin_ue", "no2_conc", "pippo"))
 
-
-
 #' Verifica e riporta iterazioni bootstrap degeneri (NA/NaN)
 #'
 #' Alcune iterazioni bootstrap possono produrre NA/NaN quando il ricampionamento
@@ -60,6 +58,7 @@ clean_label <- function(vars, dict = var_labels) {
 #'
 #' @param boot_df dataframe restituito da una delle funzioni run_bootstrap_uncertainty*()
 #' @param label etichetta descrittiva del metodo di bootstrap, usata nel messaggio
+#' @return Ritorna invisibilmente il numero di iterazioni degeneri (n_na)
 check_boot_diagnostics <- function(boot_df, label = "bootstrap") {
   n_tot <- nrow(boot_df)
   n_na  <- sum(!complete.cases(boot_df))
@@ -71,8 +70,13 @@ check_boot_diagnostics <- function(boot_df, label = "bootstrap") {
       "probabile assenza di unità esposte nel campione ricampionato. ",
       "Escluse automaticamente da quantile()/mean() con na.rm = TRUE."
     ))
+  } else {
+    message(glue::glue(
+      "[{label}] Diagnostica OK: 0/{n_tot} iterazioni degeneri (NA/NaN). ",
+      "Tutti i campioni bootstrap sono validi!"
+    ))
   }
   
+  # Ritorna n_na in modo invisibile per uso programmatico
   invisible(n_na)
 }
-
