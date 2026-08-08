@@ -1,7 +1,10 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Project Work BRCPS26 Architecture
+# Project Work Architecture
+
+**Biostatistica per la Ricerca Clinica e la Pubblicazione Scientifica
+(BRCPS 2026)**
 
 pw_data_analysis_pipeline/
 
