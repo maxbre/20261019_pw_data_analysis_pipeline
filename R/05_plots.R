@@ -343,7 +343,7 @@ plot_bootstrap_density <- function(boot_results, stima_centrale, output_path = N
       subtitle = "Distribuzione dei decessi annui evitati mediante G-computation (Bootstrap)",
       x = "Casi Evitati in Regione Veneto", 
       y = "Densità",
-      caption = "Area colorata rappresenta IC 95% con metodo percentili.\nPropaga incertezza campionaria ed epidemiologica RR da letteratura (OMS)."
+      caption = "Area colorata rappresenta IC 95% con metodo percentili.\nPropagazione incertezza."
       
     ) +
     theme_minimal(base_size = 11)
