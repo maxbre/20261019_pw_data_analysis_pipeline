@@ -98,7 +98,7 @@ map_density <- plot_census_map(
   legend_title = "Abitanti / ha\n(scala log)"
 )
 
-ggsave("./output/densita_popolazione_veneto.png", map_density, width = 10, height = 8, dpi = 300)
+ggsave("./output/densita_popolazione_veneto.png", map_density, bg = "white", width = 10, height = 8, dpi = 300)
 
 # ==============================================================================
 # DIAGNOSTICA TREND NO2
@@ -155,7 +155,7 @@ mk_comuni_pop <- mk_comuni |>
 exposure_summary <- calculate_trend_exposure(
   mk_comuni    = mk_comuni, 
   sez_analyzed = sez_analyzed
-)
+  )
 
 exposure_summary
 
@@ -192,6 +192,7 @@ plot_ps_overlap(
 
 # --- PESI ATE ---
 # Formula: 1/PS per i trattati, 1/(1-PS) per i controlli
+
 # --- PESI ATT ---
 # Formula: 1 per i trattati, PS/(1-PS) per i controlli
 
@@ -301,6 +302,8 @@ RR_finale <- data.frame(
 
 RR_finale
 
+write_csv(RR_finale, './output/tab_rr_modello_calibrazione_output.csv')
+
 # nota
 
 # n $RR = 0.997$ indica una variazione dello $0.3\%$, 
@@ -364,7 +367,7 @@ formula_outcome_full <- as.formula(attesi_30p ~ pol_bin_ue +
 outcome_survey_full <- fit_survey_outcome(df_analysis, formula_outcome_full)
 summary(outcome_survey_full)
 
-# Dispersion parameter for quasipoisson family taken to be 2.103768e-30) cioè quasi zero
+# Dispersion parameter for quasipoisson family taken to be 2.103768e-30) cioè praticamente zero
 # Standard Error dei coefficienti: tutti nell'ordine di $10^{-17}$
 # valori $t$ e stime: numeri totalmente degenerati (es. $t = -7.44 \times 10^{16}$).
 
@@ -429,6 +432,8 @@ RR_finale_strata <- data.frame(
 
 RR_finale_strata
 
+write_csv(RR_finale_strata, './output/tab_rr_modello_calibrazione_strata_output.csv')
+
 # Il confronto della bontà di adattamento tramite l'Akaike Information Criterion 
 # per modelli survey pesati (AIC) conferma la superiorità del modello con stratificazione 
 # geografica nel disegno di campionamento ($AIC = 81.55789$, $eff.p = 0.05117$) 
@@ -452,6 +457,7 @@ mean_c_exposed <- df_analysis |>
   summarise(mean_no2 = mean(mean_no2, na.rm = TRUE)) |> 
   pull(mean_no2)
 
+# mean delta c for exposed
 delta_c <- mean_c_exposed - c_target
 
 #################################################################################
@@ -461,11 +467,11 @@ delta_c <- mean_c_exposed - c_target
 #message(glue("Casi attribuibili (Stima Centrale): {round(gcomp_results$casi_attribuibili, 2)} casi"))
 #message(glue("Frazione Attribuibile (PAF): {round(gcomp_results$paf_percentuale, 2)}%"))
 
-# integrazione dinamica della riscalatura RR
+# integrazione dinamica della riscalatura RR, cfr modulo 03_outcome_models.R
 
 gcomp_results <- run_g_computation_scaled(
   #survey_model = outcome_survey,
-  survey_model = outcome_survey,  # <-----
+  survey_model = outcome_survey_strata,  # <-----
   data         = df_analysis,
   rr_lit       = 1.05,        # RR OMS per +10 ug/m3
   soglia_cut   = 20,          # vincolo STESSA SOGLIA usata per pol_bin_ue
@@ -488,10 +494,12 @@ message(glue("Frazione Attribuibile (PAF): {round(gcomp_results$paf_percentuale,
 #   rr_lower = 1.03, 
 #   rr_upper = 1.07
 # )
+# cfr modulo 03_outcome_models.R
 
 boot_distribution <- run_bootstrap_uncertainty(
   data            = df_analysis,
   formula_outcome = formula_outcome,
+  strata_var = "id_pro_fct",
   B               = 500,
   rr_central      = 1.05,
   rr_lower        = 1.03,
@@ -500,6 +508,7 @@ boot_distribution <- run_bootstrap_uncertainty(
   var_no2_cont    = "mean_no2"
   )
 
+# in 00_utils.R
 # Diagnostica iterazioni degeneri (NA/NaN) prima di calcolare qualunque riepilogo
 check_boot_diagnostics(boot_distribution, label = "Bootstrap Standard")
 
@@ -508,10 +517,13 @@ ci_boot <- quantile(boot_distribution$casi_attribuibili, probs = c(0.025, 0.975)
 message(glue("Intervallo di Confidenza 95% (Bootstrap Standard): [{round(ci_boot[1], 1)} ; {round(ci_boot[2], 1)}]"))
 plot_bootstrap_density(boot_distribution$casi_attribuibili, gcomp_results$casi_attribuibili, "./output/bootstrap_uncertainty.png")
 
-# 2. Cluster Bootstrap (Comuni)
+### clustering comunale --------------------------------------------------------
+
+# Cluster Bootstrap (Comuni)
 boot_distribution_cluster <- run_bootstrap_uncertainty_cluster(
   data = df_analysis, 
   formula_outcome = formula_outcome,
+  strata_var = "id_pro_fct",
   cluster_var = "cod_comune",
   B = 500, 
   rr_central = 1.05, 
@@ -522,6 +534,7 @@ boot_distribution_cluster <- run_bootstrap_uncertainty_cluster(
   weight_var = "weight_ate_wz"
   )
 
+# in 00_utils.R
 check_boot_diagnostics(boot_distribution_cluster, label = "Bootstrap Cluster")
 
 ci_boot_clust <- quantile(boot_distribution_cluster$casi_attribuibili, probs = c(0.025, 0.975), na.rm = TRUE)
@@ -529,10 +542,13 @@ message(glue("Intervallo di Confidenza 95% (Bootstrap Cluster): [{round(ci_boot_
 mean_boot_cluster <- mean(boot_distribution_cluster$casi_attribuibili, na.rm = TRUE)
 plot_bootstrap_density(boot_distribution_cluster$casi_attribuibili, mean_boot_cluster, "./output/bootstrap_uncertainty_cluster_comune.png")
 
+# bootstrap spazio temporale ------------------------------------------------------------
+
 # Block Bootstrap Spazio-Temporale (Comuni + Variabilità Annuale)
 boot_distribution_spattemp <- run_bootstrap_uncertainty_spatiotemporal(
   data = df_analysis,
   formula_outcome = formula_outcome,
+  strata_var = "id_pro_fct",
   col_years = col_years_analysis,
   cluster_var = "cod_comune",
   threshold = 20,
@@ -543,6 +559,7 @@ boot_distribution_spattemp <- run_bootstrap_uncertainty_spatiotemporal(
   weight_var = "weight_ate_wz"
   )
 
+# in 00_utils.R
 check_boot_diagnostics(boot_distribution_spattemp, label = "Bootstrap Spazio-Temporale")
 
 ci_boot_spattemp <- quantile(boot_distribution_spattemp$casi_attribuibili, probs = c(0.025, 0.975), na.rm = TRUE)
@@ -655,4 +672,4 @@ sensitivity_sf <- prepare_spatial_sensitivity_data(
 plot_map_sensitivity_faceted(sensitivity_sf, output_path = "./output/mappa_sensibilita_regimi_causali.png")
 plot_sensitivity_bars(sensitivity_sf, output_path = "./output/barplot_sensibilita_regimi_causali.png")
 
-message("--- ...AND THIS IS THE END, MY ONLY FRIEND THE END! Check output/ ---")
+message("--- ...AND THIS IS THE END, MY ONLY FRIEND THE END! Check the output!/ ---")
