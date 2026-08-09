@@ -88,6 +88,8 @@ sez_analyzed <- process_census_demographics(sez_raw)
 sez_summary_table <- summarise_regional_demographics(sez_analyzed)
 sez_summary_table
 
+write_csv(sez_summary_table, "./output/sezioni_censuarie_summary.csv")
+
 # Mappe Demografiche Descrittive
 map_density <- plot_census_map(
   sez_analyzed, 
@@ -118,6 +120,8 @@ mk_comuni <- compute_municipal_mk_sen(
 sintesi_trend <- mk_comuni |> count(direzione)
 sintesi_trend
 
+write_csv(sintesi_trend, './output/no2_trend_anno_sezione.csv')
+
 # Generazione Mappa Diagnostica, see file R/06_trend_mk_sen.R
 map_sen_slope <- plot_mk_sen_map(
   shp       = shp_comuni, 
@@ -147,6 +151,8 @@ pop_comunale <- sez_analyzed |>
     pop_30p_tot    = sum(pop_30p, na.rm = TRUE),
     pop_65p_tot    = sum(pop_65p, na.rm = TRUE)
   )
+
+write_csv(pop_comunale, './output/popolazione_comune_istat_2021.csv')
 
 mk_comuni_pop <- mk_comuni |> 
   left_join(pop_comunale, by = "COMUNE")
@@ -197,7 +203,9 @@ plot_ps_overlap(
 # Formula: 1 per i trattati, PS/(1-PS) per i controlli
 
 # check weights distribution
+#ATE (check formula)
 hist(df_weights$weight_ate_wz, breaks =50)
+#ATT (check formula)
 hist(df_weights$weight_att_wz, breaks =50)
 
 # Calcolo diagnostica del bilanciamento (ATE e ATT)
@@ -210,6 +218,8 @@ tbl_bal_ate <- as_tibble(bal_ate$Balance, rownames = "variable") |>
 
 # ready for a table
 tbl_bal_ate |> select(variable, variable_clean, Diff.Un, Diff.Adj)
+
+write_csv(tbl_bal_ate, './output/covariates_standardised_mean_difference.csv')
 
 # Love Plots
 plot_love_ate(bal_ate, "./output/love_plot_ate_originale.png")
@@ -225,9 +235,11 @@ plot_love_comparison(bal_ate, bal_att, "./output/love_plot_confronto_3_vie.png")
 # Grafico specchiato overlap
 plot_mirrored_overlap(df_weights, "./output/mirrored_ps_overlap.png")
 
-# Verifica quantitativa del Common Support
+# Verifica quantitativa del Common Support (see comment)
 overlap_metrics <- evaluate_common_support(df_weights)
 overlap_metrics$out_summary
+
+write_csv(overlap_metrics$out_summary, './output/propensity_score_check_common_support.csv')
 
 # verifica quantitativa del common support conferma il controllo visivo (grafico): solo 4 sezioni
 # censuarie su 37.989 (0.01%) cadono fuori dalla regione di sovrapposizione comune tra i gruppi
@@ -439,7 +451,7 @@ write_csv(RR_finale_strata, './output/tab_rr_modello_calibrazione_strata_output.
 # geografica nel disegno di campionamento ($AIC = 81.55789$, $eff.p = 0.05117$) 
 # rispetto al modello unstratified ($AIC = 81.55828$, $eff.p = 0.05136$). 
 # Ma le stime puntuali degli effetti rimangano pressoché identiche.
-# Di fatto sono modelli equivalenti
+# Di fatto sono due modelli equivalenti
 
 
 ####################################################################################
@@ -460,6 +472,8 @@ mean_c_exposed <- df_analysis |>
 # mean delta c for exposed
 delta_c <- mean_c_exposed - c_target
 
+delta_c
+
 #################################################################################
 
 # G-computation con RR di letteratura (OMS / VIIAS = 1.05)
@@ -467,7 +481,8 @@ delta_c <- mean_c_exposed - c_target
 #message(glue("Casi attribuibili (Stima Centrale): {round(gcomp_results$casi_attribuibili, 2)} casi"))
 #message(glue("Frazione Attribuibile (PAF): {round(gcomp_results$paf_percentuale, 2)}%"))
 
-# integrazione dinamica della riscalatura RR, cfr modulo 03_outcome_models.R
+# integrazione dinamica della riscalatura RR
+# cfr modulo 03_outcome_models.R
 
 gcomp_results <- run_g_computation_scaled(
   #survey_model = outcome_survey,
@@ -476,10 +491,41 @@ gcomp_results <- run_g_computation_scaled(
   rr_lit       = 1.05,        # RR OMS per +10 ug/m3
   soglia_cut   = 20,          # vincolo STESSA SOGLIA usata per pol_bin_ue
   var_no2_cont = "mean_no2"
-)
+  )
 
 message(glue("Casi attribuibili (Stima Centrale): {round(gcomp_results$casi_attribuibili, 2)} casi"))
 message(glue("Frazione Attribuibile (PAF): {round(gcomp_results$paf_percentuale, 2)}%"))
+
+
+# map attributable cases per section
+
+# join shapefile/GPKG originale (sez_raw) per ripristinare le geometrie
+sf_mapped <- sez_raw |> 
+  select(SEZ21_ID, geom) |> # Selezioniamo solo ID e geometria per non duplicare colonne
+  left_join(gcomp_results$data_pred, by = "SEZ21_ID")
+
+# mappatura dei Casi Attribuibili (sf_mapped è un oggetto sf completo)
+sf_mapped |>
+  ggplot() +
+    geom_sf(aes(fill = casi_attr_sez), colour= NA) +
+  scale_fill_viridis_c(
+    option   = "plasma", 
+    name     = "Casi Attribuibili",
+    na.value = "grey80" #"transparent"
+  ) +
+  theme_void() +
+  labs(
+    title    = "Impatto Epidemiologico NO2 per Sezione Censuaria",
+    subtitle = "Stima dei casi attribuibili al superamento dei 20 µg/m³",
+    caption  = "Elaborazione su dati ISTAT 2021 e Modello G-Computation"
+  ) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10, margin = margin(b = 8)),
+    legend.position = "right"
+  )
+
+ggsave("./output/casi_attribuibili_no2_per_sezione.png", bg = "white", width = 10, height = 8, dpi = 300)
 
 # ==========================================
 # PROPAGAZIONE INCERTEZZA (BOOTSTRAP)
@@ -638,9 +684,11 @@ plot_map_weights_ate(sezioni_ps_sf, output_path = "./output/mappa_pesi_iptw_ate_
 
 # map mortalità attesa 30p (da R/07_pop_analysis.R) -----------------------------------------------
 # non molto significativa considerato che è derivata dall'applicazione di un tasso provinciale
-plot_map_mortality_expected(sezioni_ps_sf)
-# è una mappa di dove risiede popolazione vulnerabile
+# plot_map_mortality_expected(sezioni_ps_sf)
+# di fatto è una mappa che indica dove risiede popolazione vulnerabile
+# ricorda che è una mappa attuariale non di impatto
 
+# next plot is a new version, better
 ##############################################################################################
 # Confini provinciali aggregati dallo shapefile comunale (per overlay diagnostico)
 # shp_comuni non ha una colonna PROVINCIA: il codice provincia si ricava dalle
@@ -659,17 +707,24 @@ plot_map_baseline_vulnerability(
   output_path = "./output/mappa_vulnerabilita_demografica_base.png"
 )
 
+# mapping the propensity score -------------------------------------------------
+
 # Classificazione e Mappa dei Regimi Causali (Soglia PS = 0.20)
 sezioni_contrast_sf <- prepare_causal_contrast_data(sezioni_ps_sf, ps_threshold = 0.20)
 plot_map_causal_contrast(sezioni_contrast_sf, output_path = "./output/mappa_regimi_causali_020.png")
 
-# Analisi di Sensibilità Spaziale (Soglie PS = 0.15, 0.20, 0.25, 0.45)
+# Analisi di Sensibilità Spaziale Propensity Score 
+# CHECK Soglie PS = 0.15, 0.20, 0.25, 0.45
 sensitivity_sf <- prepare_spatial_sensitivity_data(
   sezioni_ps_sf, 
   thresholds = c(0.15, 0.20, 0.25, 0.45)
 )
 
+# faceted map, see 05_plots.R
 plot_map_sensitivity_faceted(sensitivity_sf, output_path = "./output/mappa_sensibilita_regimi_causali.png")
+
+# barplot, see 05_plots.R
 plot_sensitivity_bars(sensitivity_sf, output_path = "./output/barplot_sensibilita_regimi_causali.png")
 
+#---------------------------------------------------------------------------------
 message("--- ...AND THIS IS THE END, MY ONLY FRIEND THE END! Check the output!/ ---")
