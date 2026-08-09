@@ -41,8 +41,9 @@ plot_province_boxplot <- function(data, province_labels, fname_pol, cft_value = 
   p <- p +
     scale_x_discrete(labels = province_labels) +
     labs(
-      title = glue("Boxplot per Province, grand median {grand_median_val} µg/m³"),
-      x = "Province ID", y = "Concentrazione NO2"
+      #title = glue("Boxplot per Province, grand median {grand_median_val} µg/m³"),
+      title = "NO2 boxplot sezioni censuarie per Provincia",
+      x = "Province", y = "Concentrazione NO2"
     ) +
     theme_minimal()
   
@@ -94,8 +95,9 @@ plot_province_boxplot_new <- function(data, province_labels, fname_pol, cft_valu
   p <- p +
     scale_x_discrete(labels = province_labels) +
     labs(
-      title = glue("Boxplot per Province, grand median {grand_median_val} µg/m³"),
-      x = "Province ID", y = "Concentrazione NO2"
+      #title = glue("Boxplot per Province, grand median {grand_median_val} µg/m³"),
+      title = "NO2 boxplot sezioni censuarie per Provincia",
+      x = "Province", y = "Concentrazione NO2"
     ) +
     coord_cartesian(clip = "off") + # Permette al testo di uscire dall'area dei dati
     theme_minimal() +
@@ -789,7 +791,7 @@ plot_raster_no2_rv <- function(fpath_tif,
   
   # Salvataggio su disco
   if (!is.null(output_path)) {
-    ggsave(output_path, plot = p, width = 8, height = 7, dpi = 300)
+    ggsave(output_path, plot = p, bg="white", width = 8, height = 7, dpi = 300)
     message(glue::glue("--> Mappa raster salvata in: {output_path}"))
   }
   
