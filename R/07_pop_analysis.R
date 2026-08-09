@@ -208,6 +208,7 @@ plot_map_mortality_expected <- function(spatial_df, output_path = NULL) {
   return(p)
 }
 
+#see next function, more refined
 
 #' Mappa della vulnerabilità demografica di base (attesi_30p) per sezione censuaria
 #' 
