@@ -311,57 +311,125 @@ plot_mirrored_overlap <- function(data, output_path = NULL) {
 }
 
 #' Plot dei risultati del Bootstrap con densità ed intervallo di confidenza
+# plot_bootstrap_density <- function(boot_results, stima_centrale, output_path = NULL) {
+#   ci <- quantile(boot_results, probs = c(0.025, 0.975))
+#   dens <- density(boot_results)
+#   df_dens <- data.frame(x = dens$x, y = dens$y) |> 
+#     mutate(ci_zone = if_else(x >= ci[1] & x <= ci[2], "Inside", "Outside"))
+#   
+#   p <- ggplot() +
+#     geom_area(data = subset(df_dens, ci_zone == "Inside"), aes(x = x, y = y), fill = "aquamarine3", alpha = 0.2) +
+#     geom_line(data = df_dens, aes(x = x, y = y), color = "grey30", linewidth = 0.5) +
+#     geom_vline(xintercept = stima_centrale, color = "red", linetype = "dashed") +
+#     geom_vline(xintercept = ci, color = "aquamarine4", linetype = "dashed") +
+#     annotate("text", 
+#              x = stima_centrale, 
+#              y = max(df_dens$y) * 1.03, 
+#              label = paste0("Stima centrale: ", round(stima_centrale,1)), 
+#              color = "red", size = 3.5, 
+#              hjust = -0.05) +
+#     annotate("text", 
+#              x = ci[1], 
+#              y = max(df_dens$y) * 0.5, 
+#              label = paste0("IC 95% inf. (Pct 2.5): ", round(ci[1],1)), 
+#              color = "aquamarine4", size = 3.5, 
+#              hjust = 1.1) +
+#     annotate("text", 
+#              x = ci[2], 
+#              y = max(df_dens$y) * 0.5, 
+#              label = paste0("IC 95% sup. (Pct 97.5): ", round(ci[2],1)), 
+#              color = "aquamarine4", size = 3.5, 
+#              hjust = -0.1) +
+#     labs(
+#       title = expression(paste("Incertezza casi attribuibili ", NO[2])),
+#       subtitle = "Distribuzione dei decessi annui evitati mediante G-computation (Bootstrap)",
+#       x = "Casi Evitati in Regione Veneto", 
+#       y = "Densità",
+#       caption = "Area colorata rappresenta IC 95% con metodo percentili.\nPropagazione incertezza."
+#       
+#     ) +
+#     theme_minimal(base_size = 11)
+#     # theme_minimal() +
+#     #   theme(
+#     #     plot.background  = element_rect(fill = "white", color = NA),
+#     #     panel.background = element_rect(fill = "white", color = NA),
+#     #     panel.grid.minor = element_blank(),                       # Rimuove le griglie secondarie
+#     #     panel.grid.major = element_line(color = "grey92"),         # Griglia grigio chiaro molto discreta
+#     #     axis.title       = element_text(size = 10, face = "bold"),
+#     #     axis.text        = element_text(size = 9)
+#     #   )
+#   
+#   if (!is.null(output_path)) ggsave(output_path, plot = p, width = 8, height = 5, bg = "white")
+#   return(p)
+# }
+
+# new version plottin function to accomodate text on the left-----
+
+#' Plot dei risultati del Bootstrap con densità ed intervallo di confidenza
 plot_bootstrap_density <- function(boot_results, stima_centrale, output_path = NULL) {
-  ci <- quantile(boot_results, probs = c(0.025, 0.975))
-  dens <- density(boot_results)
+  
+  # Calcolo quantili (con na.rm = TRUE per sicurezza)
+  ci <- quantile(boot_results, probs = c(0.025, 0.975), na.rm = TRUE)
+  dens <- density(boot_results, na.rm = TRUE)
   df_dens <- data.frame(x = dens$x, y = dens$y) |> 
     mutate(ci_zone = if_else(x >= ci[1] & x <= ci[2], "Inside", "Outside"))
   
+  max_y <- max(df_dens$y)
+  
   p <- ggplot() +
+    # Area IC 95%
     geom_area(data = subset(df_dens, ci_zone == "Inside"), aes(x = x, y = y), fill = "aquamarine3", alpha = 0.2) +
     geom_line(data = df_dens, aes(x = x, y = y), color = "grey30", linewidth = 0.5) +
+    
+    # Linee verticali
     geom_vline(xintercept = stima_centrale, color = "red", linetype = "dashed") +
     geom_vline(xintercept = ci, color = "aquamarine4", linetype = "dashed") +
+    
+    # Annotazioni di testo
     annotate("text", 
              x = stima_centrale, 
-             y = max(df_dens$y) * 1.03, 
-             label = paste0("Stima centrale: ", round(stima_centrale,1)), 
+             y = max_y * 1.03, 
+             label = paste0("Stima centrale: ", round(stima_centrale, 1)), 
              color = "red", size = 3.5, 
              hjust = -0.05) +
+    
     annotate("text", 
              x = ci[1], 
-             y = max(df_dens$y) * 0.5, 
-             label = paste0("IC 95% inf. (Pct 2.5): ", round(ci[1],1)), 
+             y = max_y * 0.5, 
+             label = paste0("IC 95% inf. (Pct 2.5): ", round(ci[1], 1)), 
              color = "aquamarine4", size = 3.5, 
-             hjust = 1.1) +
+             hjust = 1.1) + # Se preferisci metterlo dentro, usa hjust = -0.1
+    
     annotate("text", 
              x = ci[2], 
-             y = max(df_dens$y) * 0.5, 
-             label = paste0("IC 95% sup. (Pct 97.5): ", round(ci[2],1)), 
+             y = max_y * 0.5, 
+             label = paste0("IC 95% sup. (Pct 97.5): ", round(ci[2], 1)), 
              color = "aquamarine4", size = 3.5, 
              hjust = -0.1) +
+    
+    # Espansione dinamica dell'asse X (22% a sinistra, 15% a destra) per evitare tagli
+    scale_x_continuous(expand = expansion(mult = c(0.22, 0.15))) +
+    coord_cartesian(clip = "off") +
+    
     labs(
       title = expression(paste("Incertezza casi attribuibili ", NO[2])),
       subtitle = "Distribuzione dei decessi annui evitati mediante G-computation (Bootstrap)",
       x = "Casi Evitati in Regione Veneto", 
       y = "Densità",
       caption = "Area colorata rappresenta IC 95% con metodo percentili.\nPropagazione incertezza."
-      
     ) +
-    theme_minimal(base_size = 11)
-    # theme_minimal() +
-    #   theme(
-    #     plot.background  = element_rect(fill = "white", color = NA),
-    #     panel.background = element_rect(fill = "white", color = NA),
-    #     panel.grid.minor = element_blank(),                       # Rimuove le griglie secondarie
-    #     panel.grid.major = element_line(color = "grey92"),         # Griglia grigio chiaro molto discreta
-    #     axis.title       = element_text(size = 10, face = "bold"),
-    #     axis.text        = element_text(size = 9)
-    #   )
+    theme_minimal(base_size = 11) +
+    theme(
+      plot.margin = margin(t = 15, r = 20, b = 10, l = 25) # Margini esterni extra
+    )
   
-  if (!is.null(output_path)) ggsave(output_path, plot = p, width = 8, height = 5, bg = "white")
+  if (!is.null(output_path)) {
+    ggsave(output_path, plot = p, width = 8, height = 5, bg = "white")
+  }
+  
   return(p)
 }
+
 
 # confronto distribuzioni bootstrap
 
