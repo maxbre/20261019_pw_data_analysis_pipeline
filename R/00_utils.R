@@ -80,3 +80,46 @@ check_boot_diagnostics <- function(boot_df, label = "bootstrap") {
   # Ritorna n_na in modo invisibile per uso programmatico
   invisible(n_na)
 }
+
+# ggsave plot for report with customized dimensions
+# it is simpy a wrapper of ggsave
+
+# usage example
+# p <- my_plot_function(data)
+# 
+# # default: golden ratio, larghezza piena pagina (15cm)
+# ggsave_report("plot1.png", p)
+# 
+# # override ratio (es. 4:3)
+# ggsave_report("plot2.png", p, ratio = 4/3)
+# 
+# # override larghezza (es. mezza pagina per due plot affiancati)
+# ggsave_report("plot3.png", p, width = 7.3)
+# 
+# # specificare altezza esplicita (ignora ratio)
+# ggsave_report("plot4.png", p, height = 10)
+
+
+ggsave_report <- function(filename, 
+                          plot = last_plot(),
+                          width = 15, 
+                          ratio = 1.618,
+                          height = width / ratio,
+                          units = "cm", 
+                          dpi = 300, ...) {
+  ggsave(filename = filename,
+         plot = plot,
+         width = width,
+         height = height,
+         units = units,
+         dpi = dpi, ...)
+}
+
+# opzioni pratiche per ipotesi di utilizzo
+# foglio A4 con 3 cm di margine sx e 3 cm margine dx, --> 15 cm larghezza 
+#-----------------------------------------------------------------------------------------------------------
+# Rapporto	        Width × Height (cm)	   Uso
+# Golden ratio	    15 × 9.27	             figura singola, look bilanciato
+# 4:3	              15 × 11.25	           se serve più altezza (es. leggibilità assi y)
+# 16:9	            15 × 8.44	             se il plot è largo (serie temporali, mappe orizzontali)
+# 1:1	              15 × 15	               mappe, scatter con assi comparabili — ma occhio all'altezza pagina
