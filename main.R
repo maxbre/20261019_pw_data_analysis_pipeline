@@ -1,5 +1,3 @@
-# main_new.R
-
 # ==========================================
 # LIBRERIE
 # ==========================================
@@ -56,8 +54,29 @@ plot_province_boxplot_new(
   province_labels = prov_labels, 
   fname_pol       = FNAME_POL, 
   cft_value       = 20,
-  output_path     = "./output/boxplot_no2_province_all.png"
-)
+  output_path     = "./output/boxplot_no2_province_all.png")
+
+# example how to customize the plot labels -------------------------------------
+# without modifying the original function but overwriting it 
+plot_province_boxplot_new(
+  data            = df_raw,          
+  province_labels = prov_labels, 
+  fname_pol       = FNAME_POL, 
+  cft_value       = 20,
+  output_path     = NULL)+
+  labs(title =NULL,
+       x = NULL,
+       #y = expression(NO[2] ~ "[ " * mu * "g m"^-3 * " ]")  # by hand, deadly boring
+       y = pollutant_label("NO2"))                           # by fun in 00_utils.R, better
+
+# memo
+# * → put things together tightly
+# ~ → put a space between things
+
+# save plot customised in 00_utils.R
+ggsave_report('test.png')
+
+# ------------------------------------------------------------------------------
 
 # Diagnostica ed elaborazione iniziale
 # Winsorizzazione ed esclusione geografica per l'analisi causale
