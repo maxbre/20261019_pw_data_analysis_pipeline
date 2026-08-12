@@ -123,3 +123,17 @@ ggsave_report <- function(filename,
 # 4:3	              15 × 11.25	           se serve più altezza (es. leggibilità assi y)
 # 16:9	            15 × 8.44	             se il plot è largo (serie temporali, mappe orizzontali)
 # 1:1	              15 × 15	               mappe, scatter con assi comparabili — ma occhio all'altezza pagina
+
+
+# expression of concentration
+ug_m3 <- expression(mu * "g m"^-3)
+
+# function for pollutant labelling
+pollutant_label <- function(pollutant) {
+  switch(
+    pollutant,
+    "NO2"   = expression(NO[2] ~ "[ " * mu * "g m"^-3 * " ]"),
+    "PM2.5" = expression(PM[2.5] ~ "[ " * mu * "g m"^-3 * " ]"),
+    "PM10"  = expression(PM[10] ~ "[ " * mu * "g m"^-3 * " ]")
+  )
+}
