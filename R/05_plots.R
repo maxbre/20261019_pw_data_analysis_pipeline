@@ -70,7 +70,7 @@ plot_province_boxplot_new <- function(data, province_labels, fname_pol, cft_valu
       color = "firebrick", 
       vjust = 0.5,       
       hjust = -0.1,      # Spinto fuori dal margine destro
-      size = 3,        
+      size = 2.5,        
       fontface = "italic"
     )
   
@@ -86,7 +86,7 @@ plot_province_boxplot_new <- function(data, province_labels, fname_pol, cft_valu
         color = "blue3", 
         vjust = 0.5,    # Spostato leggermente sopra la linea
         hjust = -0.1,    # Spinto fuori dal margine destro
-        size = 3, 
+        size = 2.5, 
         fontface = "italic"
       )
   }
