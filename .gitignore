@@ -7,6 +7,7 @@
 old/
 data_input/
 output/
+output_report/
 
 .Rproj.user
 .httr-oauth

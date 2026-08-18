@@ -56,8 +56,10 @@ plot_province_boxplot_new(
   cft_value       = 20,
   output_path     = "./output/boxplot_no2_province_all.png")
 
-# example how to customize the plot labels -------------------------------------
-# without modifying the original function but overwriting it 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+# without modifying the original function but overwriting it
+
 plot_province_boxplot_new(
   data            = df_raw,          
   province_labels = prov_labels, 
@@ -74,8 +76,8 @@ plot_province_boxplot_new(
 # ~ → put a space between things
 
 # save plot customised in 00_utils.R
-ggsave_report('test.png')
-
+ggsave_report('./output_report/boxplot_no2.png')
+#-------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
 # Diagnostica ed elaborazione iniziale
@@ -121,6 +123,18 @@ map_density <- plot_census_map(
 
 ggsave("./output/densita_popolazione_veneto.png", map_density, bg = "white", width = 10, height = 8, dpi = 300)
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+map_density+
+  labs(title =NULL,
+       caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/densità_pop_sezioni_censuarie.png')
+
+#-------------------------------------------------------------------------------
+
 # ==============================================================================
 # DIAGNOSTICA TREND NO2
 # ==============================================================================
@@ -156,6 +170,16 @@ ggsave(
   height   = 8,
   dpi      = 300,
   bg       = "white")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+map_sen_slope+
+  labs(title = NULL,
+       subtitle = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/sens_slope_no2_comune.png')
 
 # ------------------------------------------------------------------------------
 # Esposizione Pesata per la Popolazione
@@ -221,6 +245,20 @@ plot_ps_overlap(
 # --- PESI ATT ---
 # Formula: 1 per i trattati, PS/(1-PS) per i controlli
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_ps_overlap(
+  data        = df_weights, 
+  output_path = NULL)+
+  labs(title = NULL,
+       subtitle = NULL,
+       x=NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/stima_ps_sezioni.png')
+#-------------------------------------------------------------------------------
+
 # check weights distribution
 #ATE (check formula)
 hist(df_weights$weight_ate_wz, breaks =50)
@@ -244,6 +282,16 @@ write_csv(tbl_bal_ate, './output/covariates_standardised_mean_difference.csv')
 plot_love_ate(bal_ate, "./output/love_plot_ate_originale.png")
 plot_love_ate_clean_vars(bal_ate, "./output/love_plot_ate_originale_clean.png")
 
+#---------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_love_ate_clean_vars(bal_ate, output_path = NULL)+
+  labs(title = NULL)
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/love_plot_ate.png', bg="white")
+
+# ---------------------------------------------------------------------
+
 plot_love_att(bal_att, "./output/love_plot_att_originale.png")
 plot_love_att_clean_vars(bal_att, "./output/love_plot_att_originale_clean.png")
 
@@ -254,6 +302,16 @@ plot_love_comparison(bal_ate, bal_att, "./output/love_plot_confronto_3_vie.png")
 # Grafico specchiato overlap
 plot_mirrored_overlap(df_weights, "./output/mirrored_ps_overlap.png")
 
+#---------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_mirrored_overlap(df_weights, output_path = NULL)+
+  labs(title = NULL,
+       y= "conteggio sezioni")
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mirrored_ps_overlap.png', bg="white")
+
+#---------------------------------------------------------------------
 # Verifica quantitativa del Common Support (see comment)
 overlap_metrics <- evaluate_common_support(df_weights)
 overlap_metrics$out_summary
@@ -577,10 +635,29 @@ boot_distribution <- run_bootstrap_uncertainty(
 # Diagnostica iterazioni degeneri (NA/NaN) prima di calcolare qualunque riepilogo
 check_boot_diagnostics(boot_distribution, label = "Bootstrap Standard")
 
+# export result
+write_rds(boot_distribution, './output/boot_distribution_simple.rds')
+
 # Calcolo intervallo basato sui percentili bootstrap (na.rm = TRUE: vedi diagnostica sopra)
 ci_boot <- quantile(boot_distribution$casi_attribuibili, probs = c(0.025, 0.975), na.rm = TRUE)
 message(glue("Intervallo di Confidenza 95% (Bootstrap Standard): [{round(ci_boot[1], 1)} ; {round(ci_boot[2], 1)}]"))
 plot_bootstrap_density(boot_distribution$casi_attribuibili, gcomp_results$casi_attribuibili, "./output/bootstrap_uncertainty.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_bootstrap_density(boot_distribution$casi_attribuibili, 
+                       gcomp_results$casi_attribuibili,
+                       output_path = NULL)+
+  labs(title = NULL,
+       subtitle=NULL,
+       x= "casi attribuibili",
+       caption =NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/bootstrap_simple.png', bg="white")
+
+#-------------------------------------------------------------------------------
 
 ### clustering comunale --------------------------------------------------------
 
@@ -602,10 +679,29 @@ boot_distribution_cluster <- run_bootstrap_uncertainty_cluster(
 # in 00_utils.R
 check_boot_diagnostics(boot_distribution_cluster, label = "Bootstrap Cluster")
 
+# export result
+write_rds(boot_distribution_cluster, './output/boot_distribution_cluster_comune.rds')
+
 ci_boot_clust <- quantile(boot_distribution_cluster$casi_attribuibili, probs = c(0.025, 0.975), na.rm = TRUE)
 message(glue("Intervallo di Confidenza 95% (Bootstrap Cluster): [{round(ci_boot_clust[1], 1)} ; {round(ci_boot_clust[2], 1)}]"))
 mean_boot_cluster <- mean(boot_distribution_cluster$casi_attribuibili, na.rm = TRUE)
 plot_bootstrap_density(boot_distribution_cluster$casi_attribuibili, mean_boot_cluster, "./output/bootstrap_uncertainty_cluster_comune.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_bootstrap_density(boot_distribution_cluster$casi_attribuibili, 
+                       mean_boot_cluster, 
+                       output_path = NULL)+
+  labs(title = NULL,
+       subtitle=NULL,
+       x= "casi attribuibili",
+       caption =NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/bootstrap_cluster_comune.png', bg="white")
+
+#-------------------------------------------------------------------------------
 
 # bootstrap spazio temporale ------------------------------------------------------------
 
@@ -627,12 +723,30 @@ boot_distribution_spattemp <- run_bootstrap_uncertainty_spatiotemporal(
 # in 00_utils.R
 check_boot_diagnostics(boot_distribution_spattemp, label = "Bootstrap Spazio-Temporale")
 
+# export result
+write_rds(boot_distribution_spattemp, './output/boot_distribution_spattemp.rds')
+
 ci_boot_spattemp <- quantile(boot_distribution_spattemp$casi_attribuibili, probs = c(0.025, 0.975), na.rm = TRUE)
 message(glue("Intervallo di Confidenza 95% (Bootstrap Spazio-Temporale): [{round(ci_boot_spattemp[1], 1)} ; {round(ci_boot_spattemp[2], 1)}]"))
 mean_boot_spattemp <- mean(boot_distribution_spattemp$casi_attribuibili, na.rm = TRUE)
 # plot bootstrap
 plot_bootstrap_density(boot_distribution_spattemp$casi_attribuibili, mean_boot_spattemp, "./output/bootstrap_uncertainty_spattemp.png")
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_bootstrap_density(boot_distribution_spattemp$casi_attribuibili, 
+                       mean_boot_spattemp, 
+                       output_path = NULL)+
+  labs(title = NULL,
+       subtitle=NULL,
+       x= "casi attribuibili",
+       caption =NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/bootstrap_spattemp.png', bg="white")
+
+#-------------------------------------------------------------------------------
 # ==========================================
 # CONFRONTI METRICHE E PLOT BOOTSTRAP
 # ==========================================
@@ -661,14 +775,32 @@ plot_bootstrap_comparison(
   output_path = "./output/bootstrap_uncertainty_confronto_indip_vs_spatiotemp.png"
 ) 
 
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_bootstrap_comparison(
+  boot_distribution$casi_attribuibili,
+  boot_distribution_spattemp$casi_attribuibili,
+  methods = c("Sezioni", "Spazio-Temporale"),
+  output_path = NULL)+
+  labs(title = NULL,
+       x = "casi attribuibili")
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/cfr_bootstrap_sezioni_vs_spattemp.png', bg="white")
+
+#-------------------------------------------------------------------------------
 # Confronto a tre vie completo
-compare_bootstrap_metrics(
+cfr_metriche_bootstrap <- compare_bootstrap_metrics(
   boot_distribution$casi_attribuibili,
   boot_distribution_cluster$casi_attribuibili, 
   boot_distribution_spattemp$casi_attribuibili, 
   methods = c("Standard (Sezioni)", "Cluster (Comuni)", "Spazio-Temporale"),
   ref_method_index = 1
 )
+
+write_csv(cfr_metriche_bootstrap, './output/cfr_metriche_tipi_bootstrap.csv')
 
 # ==========================================
 # SPATIAL MAPPING & CAUSAL CONTRAST SENSITIVITY
@@ -696,10 +828,54 @@ sezioni_ps_sf <- load_and_join_spatial_data(df_weights, FPATH_SHP)
 sezioni_binary_sf <- prepare_binary_exposure_data(sezioni_ps_sf)
 plot_map_binary_exposure(sezioni_binary_sf, output_path = "./output/mappa_esposizione_binaria_no2_20.png")
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_binary_exposure(sezioni_binary_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_esposizione_binaria_no2.png', bg="white")
+
+#-------------------------------------------------------------------------------
 # Mappe Spaziali Diagnostiche di Base (da R/05_plots.R)
 plot_map_no2(sezioni_ps_sf, output_path = "./output/mappa_no2_veneto.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_no2(sezioni_ps_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_no2_sezioni_veneto.png', bg="white")
+
+#-------------------------------------------------------------------------------
+
 plot_map_propensity(sezioni_ps_sf, output_path = "./output/mappa_propensity_score_veneto.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_propensity(sezioni_ps_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_propensiy_score_sezioni_veneto.png', bg="white")
+
+#-------------------------------------------------------------------------------
 plot_map_weights_ate(sezioni_ps_sf, output_path = "./output/mappa_pesi_iptw_ate_veneto.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_weights_ate(sezioni_ps_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_pesi_iptw_ate_veneto.png', bg="white")
+
+#-------------------------------------------------------------------------------
 
 # map mortalità attesa 30p (da R/07_pop_analysis.R) -----------------------------------------------
 # non molto significativa considerato che è derivata dall'applicazione di un tasso provinciale
@@ -726,11 +902,37 @@ plot_map_baseline_vulnerability(
   output_path = "./output/mappa_vulnerabilita_demografica_base.png"
 )
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_baseline_vulnerability(
+  sezioni_ps_sf, 
+  shp_prov    = shp_prov,
+  output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_vulnerabilita_demografica_base_pop_30p.png', bg="white")
+
+#-------------------------------------------------------------------------------
+
 # mapping the propensity score -------------------------------------------------
 
 # Classificazione e Mappa dei Regimi Causali (Soglia PS = 0.20)
 sezioni_contrast_sf <- prepare_causal_contrast_data(sezioni_ps_sf, ps_threshold = 0.20)
 plot_map_causal_contrast(sezioni_contrast_sf, output_path = "./output/mappa_regimi_causali_020.png")
+
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_causal_contrast(sezioni_contrast_sf, 
+                         output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_regimi_causali_ps_020.png', bg="white")
+
+#-------------------------------------------------------------------------------
 
 # Analisi di Sensibilità Spaziale Propensity Score 
 # CHECK Soglie PS = 0.15, 0.20, 0.25, 0.45
@@ -742,8 +944,28 @@ sensitivity_sf <- prepare_spatial_sensitivity_data(
 # faceted map, see 05_plots.R
 plot_map_sensitivity_faceted(sensitivity_sf, output_path = "./output/mappa_sensibilita_regimi_causali.png")
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_map_sensitivity_faceted(sensitivity_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/mappa_sensibilita_regimi_causali.png', bg="white")
+
+#-------------------------------------------------------------------------------
 # barplot, see 05_plots.R
 plot_sensitivity_bars(sensitivity_sf, output_path = "./output/barplot_sensibilita_regimi_causali.png")
 
+#-------------------------------------------------------------------------------
+# export for report (to be  properly adjusted)
+
+plot_sensitivity_bars(sensitivity_sf, output_path = NULL)+
+  labs(title = NULL, subtitle = NULL, caption = NULL)
+
+# save plot customised in 00_utils.R
+ggsave_report('./output_report/barplot_sensibilita_regimi_causali.png', bg="white")
+
+#-------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------
 message("--- ...AND THIS IS THE END, MY ONLY FRIEND THE END! Check the output!/ ---")
